@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: weather
+    database: airflow
+    schema: weather
+    tables:
+      - name: weather_readings
+      - name: cities

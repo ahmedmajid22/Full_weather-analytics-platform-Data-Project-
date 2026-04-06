@@ -1,0 +1,25 @@
+version: 2
+
+models:
+  - name: stg_weather_readings
+    description: "Cleaned hourly weather readings for all 50 cities"
+    columns:
+      - name: city_id
+        tests: [not_null, {relationships: {to: ref('stg_cities'), field: id}}]
+      - name: reading_at
+        tests: [not_null]
+      - name: temperature_c
+        tests: [not_null]
+      - name: humidity_pct
+        tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+
+  - name: stg_cities
+    description: "City dimension with region enrichment"
+    columns:
+      - name: id
+        tests: [not_null, unique]
+      - name: name
+        tests: [not_null]

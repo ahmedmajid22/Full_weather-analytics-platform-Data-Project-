@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Env
+.env
+
+# Airflow
+airflow/logs/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+
+# Mac
+.DS_Store
+
+# Docker
+*.log

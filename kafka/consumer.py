@@ -9,15 +9,23 @@ logger = logging.getLogger(__name__)
 KAFKA_BOOTSTRAP = "kafka:9092"
 BATCH_SIZE      = 100
 
+# FIX: Define topic names as module-level constants
+TOPIC_READINGS = "weather.readings.raw"
+TOPIC_ALERTS   = "weather.alerts"
+
 
 def get_pg_conn():
-    return psycopg2.connect(host="postgres", database="airflow", user="airflow", password="airflow")
+    return psycopg2.connect(
+        host="postgres", database="airflow",
+        user="airflow", password="airflow"
+    )
 
 
-def flush_batch(batch: list, conn):
+def flush_batch(batch, conn):
     if not batch:
         return
     cursor = conn.cursor()
+    inserted = 0
     for r in batch:
         try:
             cursor.execute("""
@@ -25,13 +33,19 @@ def flush_batch(batch: list, conn):
                     (city_id, timestamp, temperature, windspeed, weather_code)
                 VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT DO NOTHING
-            """, (r.get("city_id"), r.get("timestamp"),
-                  r.get("temperature"), r.get("windspeed"), r.get("weather_code")))
+            """, (
+                r.get("city_id"),
+                r.get("timestamp"),
+                r.get("temperature"),
+                r.get("windspeed"),
+                r.get("weather_code"),
+            ))
+            inserted += 1
         except Exception as e:
-            logger.error(f"Row insert error: {e}")
+            logger.error(f"Row error: {e}")
     conn.commit()
     cursor.close()
-    logger.info(f"Flushed {len(batch)} records to PostgreSQL")
+    logger.info(f"Flushed {inserted}/{len(batch)} records to PostgreSQL")
 
 
 def main():
@@ -41,8 +55,9 @@ def main():
         "auto.offset.reset":  "earliest",
         "enable.auto.commit": False,
     })
-    consumer.subscribe(["weather.readings.raw", "weather.alerts"])
-    logger.info("Consumer started — subscribed to weather topics")
+    # FIX: Use the constant, no walrus operator
+    consumer.subscribe([TOPIC_READINGS])
+    logger.info("Consumer started — listening on weather.readings.raw")
 
     conn  = get_pg_conn()
     batch = []
@@ -62,7 +77,7 @@ def main():
                 record = json.loads(msg.value())
                 batch.append(record)
             except json.JSONDecodeError as e:
-                logger.error(f"JSON decode error: {e}")
+                logger.error(f"Bad JSON: {e}")
                 continue
 
             if len(batch) >= BATCH_SIZE:
@@ -71,7 +86,7 @@ def main():
                 batch = []
 
     except KeyboardInterrupt:
-        logger.info("Shutting down consumer")
+        logger.info("Shutting down")
     finally:
         if batch:
             flush_batch(batch, conn)

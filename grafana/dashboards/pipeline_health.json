@@ -1,0 +1,159 @@
+{
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1000}]}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+          "format": "table",
+          "rawSql": "SELECT rows_loaded FROM weather.pipeline_runs ORDER BY created_at DESC LIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Rows loaded — last run",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS total_runs FROM weather.pipeline_runs",
+          "refId": "A"
+        }
+      ],
+      "title": "Total pipeline runs",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 45}]}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+          "format": "table",
+          "rawSql": "SELECT COUNT(DISTINCT city_id) AS cities_active FROM weather.weather_readings WHERE timestamp > NOW() - INTERVAL '2 hours'",
+          "refId": "A"
+        }
+      ],
+      "title": "Cities loaded last 2h",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS total_readings FROM weather.weather_readings",
+          "refId": "A"
+        }
+      ],
+      "title": "Total readings in DB",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+      "fieldConfig": {
+        "defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "status"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-text"}}, {"id": "mappings", "value": [{"options": {"success": {"color": "green", "index": 0, "text": "success"}, "failed": {"color": "red", "index": 1, "text": "failed"}, "partial": {"color": "yellow", "index": 2, "text": "partial"}}, "type": "value"}]}]}
+        ]
+      },
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 4},
+      "id": 5,
+      "options": {"cellHeight": "sm", "footer": {"show": false}, "showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+          "format": "table",
+          "rawSql": "SELECT run_id, rows_fetched, rows_loaded, status, created_at FROM weather.pipeline_runs ORDER BY created_at DESC LIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent pipeline runs",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"lineWidth": 2}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 14},
+      "id": 6,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "expr": "weather_rows_loaded_total",
+          "legendFormat": "Rows loaded",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "expr": "weather_rows_failed_total",
+          "legendFormat": "Rows failed",
+          "refId": "B"
+        }
+      ],
+      "title": "Pipeline metrics (Prometheus)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["weather", "pipeline", "monitoring"],
+  "templating": {
+    "list": [
+      {
+        "current": {"selected": false, "text": "PostgreSQL", "value": "PostgreSQL"},
+        "hide": 2,
+        "includeAll": false,
+        "label": "Data source",
+        "multi": false,
+        "name": "DS_POSTGRESQL",
+        "options": [],
+        "query": "postgres",
+        "refresh": 1,
+        "type": "datasource"
+      },
+      {
+        "current": {"selected": false, "text": "Prometheus", "value": "Prometheus"},
+        "hide": 2,
+        "includeAll": false,
+        "label": "Prometheus",
+        "multi": false,
+        "name": "DS_PROMETHEUS",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": {"from": "now-24h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Pipeline Health",
+  "uid": "pipeline-health",
+  "version": 1
+}

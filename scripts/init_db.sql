@@ -1,4 +1,10 @@
+\connect airflow;
+
+ALTER SCHEMA public OWNER TO airflow;
+
 CREATE SCHEMA IF NOT EXISTS weather;
+ALTER SCHEMA weather OWNER TO airflow;
+GRANT ALL PRIVILEGES ON SCHEMA weather TO airflow;
 
 CREATE TABLE IF NOT EXISTS weather.cities (
     id           SERIAL PRIMARY KEY,

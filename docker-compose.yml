@@ -38,7 +38,7 @@ services:
       interval: 5s
       retries: 5
     ports:
-      - "5432:5432"
+      - "5433:5432"
 
   redis:
     image: redis:7.2
@@ -102,6 +102,21 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
 
+  kafka-producer:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./kafka:/app
+    command: >
+      bash -c "pip install confluent-kafka requests psycopg2-binary --quiet &&
+               python producer.py"
+    depends_on:
+      - kafka
+      - postgres
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
@@ -146,9 +161,15 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
     ports:
       - "3000:3000"
 
 volumes:
   postgres_data:
   minio_data:
+  grafana_data:

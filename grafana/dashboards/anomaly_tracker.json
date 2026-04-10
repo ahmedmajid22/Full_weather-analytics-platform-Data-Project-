@@ -1,0 +1,166 @@
+{
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5}, {"color": "red", "value": 20}]}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS anomalies_24h FROM weather_marts.temperature_anomalies WHERE is_anomaly = true AND reading_at > NOW() - INTERVAL '24 hours'",
+          "refId": "A"
+        }
+      ],
+      "title": "Anomalies last 24h",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 2}, {"color": "red", "value": 3}]}, "unit": "none", "decimals": 2, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+          "format": "table",
+          "rawSql": "SELECT ROUND(MAX(ABS(z_score))::numeric, 2) AS max_z_score FROM weather_marts.temperature_anomalies WHERE reading_at > NOW() - INTERVAL '24 hours'",
+          "refId": "A"
+        }
+      ],
+      "title": "Max |z-score| today",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS extreme_count FROM weather_marts.temperature_anomalies WHERE anomaly_severity = 'extreme' AND reading_at > NOW() - INTERVAL '24 hours'",
+          "refId": "A"
+        }
+      ],
+      "title": "Extreme anomalies today",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+          "format": "table",
+          "rawSql": "SELECT COUNT(DISTINCT city_name) AS cities_flagged FROM weather_marts.temperature_anomalies WHERE is_anomaly = true AND reading_at > NOW() - INTERVAL '24 hours'",
+          "refId": "A"
+        }
+      ],
+      "title": "Cities flagged today",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+      "fieldConfig": {
+        "defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "z_score"}, "properties": [{"id": "custom.cellOptions", "value": {"mode": "gradient", "type": "gauge"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 2}, {"color": "red", "value": 3}]}}]},
+          {"matcher": {"id": "byName", "options": "temperature_c"}, "properties": [{"id": "unit", "value": "celsius"}]}
+        ]
+      },
+      "gridPos": {"h": 12, "w": 16, "x": 0, "y": 4},
+      "id": 5,
+      "options": {"cellHeight": "sm", "footer": {"show": false}, "showHeader": true, "sortBy": [{"desc": true, "displayName": "z_score"}]},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+          "format": "table",
+          "rawSql": "SELECT city_name, reading_at, temperature_c, ROUND(z_score::numeric, 3) AS z_score, anomaly_severity FROM weather_marts.temperature_anomalies WHERE is_anomaly = true ORDER BY ABS(z_score) DESC LIMIT 25",
+          "refId": "A"
+        }
+      ],
+      "title": "Top anomalies by z-score",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"lineWidth": 1}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 12, "w": 8, "x": 16, "y": 4},
+      "id": 6,
+      "options": {"barRadius": 0.1, "groupWidth": 0.7, "legend": {"displayMode": "list", "placement": "bottom"}, "orientation": "horizontal"},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+          "format": "table",
+          "rawSql": "SELECT city_name, COUNT(*) AS anomaly_count FROM weather_marts.temperature_anomalies WHERE is_anomaly = true GROUP BY city_name ORDER BY anomaly_count DESC LIMIT 15",
+          "refId": "A"
+        }
+      ],
+      "title": "Most anomalous cities",
+      "type": "barchart"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+      "fieldConfig": {
+        "defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "temperature_c"}, "properties": [{"id": "unit", "value": "celsius"}]},
+          {"matcher": {"id": "byName", "options": "windspeed_kmh"}, "properties": [{"id": "unit", "value": "velocitykmh"}]},
+          {"matcher": {"id": "byName", "options": "precipitation_mm"}, "properties": [{"id": "unit", "value": "mm"}]}
+        ]
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "id": 7,
+      "options": {"cellHeight": "sm", "footer": {"show": false}, "showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "${DS_POSTGRESQL}"},
+          "format": "table",
+          "rawSql": "SELECT city_name, country, reading_at, temperature_c, windspeed_kmh, precipitation_mm, event_type FROM weather_marts.extreme_weather ORDER BY reading_at DESC LIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent extreme weather events",
+      "type": "table"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": ["weather", "anomaly"],
+  "templating": {
+    "list": [
+      {
+        "current": {"selected": false, "text": "PostgreSQL", "value": "PostgreSQL"},
+        "hide": 2,
+        "includeAll": false,
+        "label": "Data source",
+        "multi": false,
+        "name": "DS_POSTGRESQL",
+        "options": [],
+        "query": "postgres",
+        "refresh": 1,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": {"from": "now-7d", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Anomaly Tracker",
+  "uid": "anomaly-tracker",
+  "version": 1
+}

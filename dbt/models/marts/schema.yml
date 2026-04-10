@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: daily_summary
+    description: "Daily min/max/avg weather per city"
+    columns:
+      - name: city_name
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: avg_temp_c
+        tests: [not_null]
+
+  - name: temperature_anomalies
+    description: "Statistical anomaly detection — z-score and robust IQR score"
+    columns:
+      - name: city_name
+        tests: [not_null]
+      - name: z_score
+        tests: [not_null]
+
+  - name: city_comparisons
+    description: "All-time summary stats per city for global comparison"
+
+  - name: weekly_trends
+    description: "7-day rolling average temperature per city"
+
+  - name: extreme_weather
+    description: "Heatwaves, freezes, storms and high wind events"

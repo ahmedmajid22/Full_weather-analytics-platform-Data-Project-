@@ -1,17 +1,42 @@
+{{
+    config(
+        materialized='table',
+        schema='marts'
+    )
+}}
+
+WITH base AS (
+    SELECT
+        r.city_id,
+        r.reading_at,
+        r.temperature_c,
+        r.feels_like_c,
+        r.precipitation_mm,
+        r.windspeed_kmh,
+        r.humidity_pct,
+        r.weather_condition
+    FROM {{ ref('stg_weather_readings') }} r
+),
+cities AS (
+    SELECT id, name, country, continent, region
+    FROM {{ ref('stg_cities') }}
+)
+
 SELECT
-    c.name          AS city_name,
-    c.country,
-    c.continent,
-    DATE(r.reading_at) AS date,
-    ROUND(AVG(r.temperature_c)::NUMERIC, 2)    AS avg_temp_c,
-    ROUND(MIN(r.temperature_c)::NUMERIC, 2)    AS min_temp_c,
-    ROUND(MAX(r.temperature_c)::NUMERIC, 2)    AS max_temp_c,
-    ROUND(SUM(r.precipitation_mm)::NUMERIC, 2) AS total_precip_mm,
-    ROUND(AVG(r.windspeed_kmh)::NUMERIC, 2)    AS avg_windspeed,
-    ROUND(AVG(r.humidity_pct)::NUMERIC, 1)     AS avg_humidity,
-    MODE() WITHIN GROUP (ORDER BY r.weather_condition) AS dominant_condition,
-    COUNT(*) AS reading_count
-FROM {{ ref('stg_weather_readings') }} r
-JOIN {{ ref('stg_cities') }}           c ON c.id = r.city_id
-GROUP BY c.name, c.country, c.continent, DATE(r.reading_at)
+    cities.name                                         AS city_name,
+    cities.country,
+    cities.continent,
+    cities.region,
+    DATE(base.reading_at)                               AS date,
+    ROUND(AVG(base.temperature_c)::NUMERIC, 2)          AS avg_temp_c,
+    ROUND(MIN(base.temperature_c)::NUMERIC, 2)          AS min_temp_c,
+    ROUND(MAX(base.temperature_c)::NUMERIC, 2)          AS max_temp_c,
+    ROUND(SUM(base.precipitation_mm)::NUMERIC, 2)       AS total_precip_mm,
+    ROUND(AVG(base.windspeed_kmh)::NUMERIC, 2)          AS avg_windspeed_kmh,
+    ROUND(AVG(base.humidity_pct)::NUMERIC, 1)           AS avg_humidity_pct,
+    MODE() WITHIN GROUP (ORDER BY base.weather_condition) AS dominant_condition,
+    COUNT(*)                                            AS reading_count
+FROM base
+JOIN cities ON cities.id = base.city_id
+GROUP BY cities.name, cities.country, cities.continent, cities.region, DATE(base.reading_at)
 ORDER BY date DESC, city_name

@@ -114,11 +114,13 @@ def load_to_postgres(**context):
     cursor = conn.cursor()
     run_id = context["run_id"]
     rows_loaded = 0
+    rows_fetched = 0
 
     for city_result in results:
         city_id = city_result["city_id"]
         hourly  = city_result["data"].get("hourly", {})
         times   = hourly.get("time", [])
+        rows_fetched += len(times)
 
         for i, ts in enumerate(times):
             try:
@@ -147,17 +149,17 @@ def load_to_postgres(**context):
             except Exception as e:
                 print(f"Row error city_id={city_id} ts={ts}: {e}")
 
-    # Log this pipeline run
+    # Log this pipeline run with both rows_fetched and rows_loaded
     cursor.execute("""
-        INSERT INTO weather.pipeline_runs (run_id, rows_loaded, status)
-        VALUES (%s, %s, %s)
-    """, (run_id, rows_loaded, "success"))
+        INSERT INTO weather.pipeline_runs (run_id, rows_fetched, rows_loaded, status)
+        VALUES (%s, %s, %s, %s)
+    """, (run_id, rows_fetched, rows_loaded, "success"))
 
     conn.commit()
     cursor.close()
     conn.close()
 
-    print(f"Loaded {rows_loaded} rows to PostgreSQL")
+    print(f"Fetched {rows_fetched} records, loaded {rows_loaded} rows to PostgreSQL")
     _push_metrics("load_postgres", rows_loaded, 0)
     return rows_loaded
 

@@ -22,5 +22,3 @@ models:
     marts:
       +materialized: table
       +schema: marts
-      +indexes:
-        - columns: ['city_id']

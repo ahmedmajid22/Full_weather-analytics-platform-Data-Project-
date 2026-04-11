@@ -36,62 +36,35 @@
 
 <br/>
 
-<!-- Hero screenshot — full width, maximum visual impact -->
+<!-- Hero screenshot -->
 <div align="center">
-  <img src="1.png" width="100%" alt="Grafana Global Weather Dashboard — Geomap + City Rankings"/>
-</div>
-
-<div align="center">
-  <sup><b>Global Weather Dashboard</b> — Live geomap of all 50 cities colored by average temperature, with a sortable city ranking table alongside it.</sup>
+  <img src="1.png" width="95%" style="border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </div>
 
 <br/><br/>
 
 <!-- Two dashboards side by side -->
 <div align="center">
-  <img src="2.png" width="48.5%" alt="Anomaly Tracker Dashboard"/>
-  &nbsp;&nbsp;
-  <img src="3.png" width="48.5%" alt="City Deep Dive Dashboard"/>
-</div>
-
-<div align="center">
-  <sup>
-    <b>Anomaly Tracker</b> (left) — Z-score gauges, most anomalous cities, and extreme weather event log
-    &nbsp;·&nbsp;
-    <b>City Deep Dive</b> (right) — Per-city daily temperature range, precipitation, humidity, and wind
-  </sup>
+  <img src="2.png" width="48%" style="border-radius:10px; margin-right:1%; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
+  <img src="3.png" width="48%" style="border-radius:10px; margin-left:1%; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </div>
 
 <br/><br/>
 
-<!-- Airflow + Kafka side by side -->
+<!-- Airflow + Kafka -->
 <div align="center">
-  <img src="4.png" width="48.5%" alt="Airflow DAG — Three tasks, all green"/>
-  &nbsp;&nbsp;
-  <img src="5.png" width="48.5%" alt="Kafka UI — Live messages on weather.readings.raw"/>
-</div>
-
-<div align="center">
-  <sup>
-    <b>Airflow ETL DAG</b> (left) — <code>fetch_and_stage → load_to_postgres → validate_data</code>, all tasks green
-    &nbsp;·&nbsp;
-    <b>Kafka UI</b> (right) — Live messages flowing on <code>weather.readings.raw</code> every 5 minutes
-  </sup>
+  <img src="4.png" width="48%" style="border-radius:10px; margin-right:1%; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
+  <img src="5.png" width="48%" style="border-radius:10px; margin-left:1%; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </div>
 
 <br/><br/>
 
-<!-- Pipeline health — full width -->
+<!-- Pipeline health -->
 <div align="center">
-  <img src="6.png" width="100%" alt="Pipeline Health Dashboard — Prometheus metrics and run history"/>
-</div>
-
-<div align="center">
-  <sup><b>Pipeline Health Dashboard</b> — Rows loaded per run, city coverage, color-coded run history, and Prometheus metrics timeseries.</sup>
+  <img src="6.png" width="95%" style="border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </div>
 
 <br/>
-
 ---
 
 ## 📐 Architecture

@@ -4,12 +4,14 @@
 > Built with Apache Airflow, Apache Kafka, dbt, MinIO, PostgreSQL, and Grafana.
 > Runs entirely on Docker Compose — zero cloud spend.
 
-![Python 3.11](1.png)
-![Apache Airflow](2.png)
-![Apache Kafka](3.png)
-![dbt](4.png)
-![PostgreSQL](5.png)
-![Grafana](6.png)
+<div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 20px;">
+  <img src="1.png" alt="Python 3.11" style="height: 28px;">
+  <img src="2.png" alt="Apache Airflow" style="height: 28px;">
+  <img src="3.png" alt="Apache Kafka" style="height: 28px;">
+  <img src="4.png" alt="dbt" style="height: 28px;">
+  <img src="5.png" alt="PostgreSQL" style="height: 28px;">
+  <img src="6.png" alt="Grafana" style="height: 28px;">
+</div>
 
 ---
 
@@ -101,7 +103,7 @@ Full decisions with alternatives considered: [`docs/adr/`](docs/adr/)
 
 ## Key engineering decisions
 
-**Idempotent loading:** Every `INSERT` uses `ON CONFLICT DO UPDATE`, so the DAG is safe to rerun without creating duplicate rows — essential for Airflow\'s retry mechanism.
+**Idempotent loading:** Every `INSERT` uses `ON CONFLICT DO UPDATE`, so the DAG is safe to rerun without creating duplicate rows — essential for Airflow\\'s retry mechanism.
 
 **Exactly-once Kafka delivery:** Producer is configured with `acks=all`, `enable.idempotence=True`, and `compression.type=snappy`. This combination prevents message loss if a broker restarts mid-batch and avoids silent duplicates.
 

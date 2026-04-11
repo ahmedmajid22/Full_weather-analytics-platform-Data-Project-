@@ -32,6 +32,68 @@
 
 ---
 
+## 🖼️ Platform in Action
+
+<br/>
+
+<!-- Hero screenshot — full width, maximum visual impact -->
+<div align="center">
+  <img src="1.png" width="100%" alt="Grafana Global Weather Dashboard — Geomap + City Rankings"/>
+</div>
+
+<div align="center">
+  <sup><b>Global Weather Dashboard</b> — Live geomap of all 50 cities colored by average temperature, with a sortable city ranking table alongside it.</sup>
+</div>
+
+<br/><br/>
+
+<!-- Two dashboards side by side -->
+<div align="center">
+  <img src="2.png" width="48.5%" alt="Anomaly Tracker Dashboard"/>
+  &nbsp;&nbsp;
+  <img src="3.png" width="48.5%" alt="City Deep Dive Dashboard"/>
+</div>
+
+<div align="center">
+  <sup>
+    <b>Anomaly Tracker</b> (left) — Z-score gauges, most anomalous cities, and extreme weather event log
+    &nbsp;·&nbsp;
+    <b>City Deep Dive</b> (right) — Per-city daily temperature range, precipitation, humidity, and wind
+  </sup>
+</div>
+
+<br/><br/>
+
+<!-- Airflow + Kafka side by side -->
+<div align="center">
+  <img src="4.png" width="48.5%" alt="Airflow DAG — Three tasks, all green"/>
+  &nbsp;&nbsp;
+  <img src="5.png" width="48.5%" alt="Kafka UI — Live messages on weather.readings.raw"/>
+</div>
+
+<div align="center">
+  <sup>
+    <b>Airflow ETL DAG</b> (left) — <code>fetch_and_stage → load_to_postgres → validate_data</code>, all tasks green
+    &nbsp;·&nbsp;
+    <b>Kafka UI</b> (right) — Live messages flowing on <code>weather.readings.raw</code> every 5 minutes
+  </sup>
+</div>
+
+<br/><br/>
+
+<!-- Pipeline health — full width -->
+<div align="center">
+  <img src="6.png" width="100%" alt="Pipeline Health Dashboard — Prometheus metrics and run history"/>
+</div>
+
+<div align="center">
+  <sup><b>Pipeline Health Dashboard</b> — Rows loaded per run, city coverage, color-coded run history, and Prometheus metrics timeseries.</sup>
+</div>
+
+<br/>
+
+---
+
 ## 📐 Architecture
 
 ```
@@ -218,7 +280,7 @@ All four dashboards are committed as JSON and provisioned automatically on conta
 | Transformation | **dbt Core 1.7** | Lineage graph, column-level tests, ephemeral intermediates |
 | Dashboards | **Grafana** | Provisioned-as-code JSON; reproducible with no clicks |
 | Monitoring | **Prometheus + Pushgateway** | Pull-based metrics; pipeline health SLOs |
-| Data source | **Open-Meteo API** | Free, no API key, no rate limits for non-commercial use, 80+ years of history — OpenWeatherMap free tier caps at 1,000 calls/day; this pipeline needs 1,200 |
+| Data source | **Open-Meteo API** | Free, no API key, no rate limits — OpenWeatherMap free tier caps at 1,000 calls/day; this pipeline needs 1,200 |
 
 See [`docs/adr/`](docs/adr/) for full Architecture Decision Records with alternatives considered.
 
@@ -227,7 +289,7 @@ See [`docs/adr/`](docs/adr/) for full Architecture Decision Records with alterna
 ## 🔑 Key Engineering Decisions
 
 **Idempotent loading**
-Every INSERT uses `ON CONFLICT (city_id, timestamp) DO UPDATE SET ...`. This means the DAG is safe to rerun at any time — Airflow's retry mechanism will never produce duplicate rows.
+Every INSERT uses `ON CONFLICT (city_id, timestamp) DO UPDATE SET ...`. The DAG is safe to rerun at any time — Airflow's retry mechanism will never produce duplicate rows.
 
 **Exactly-once Kafka delivery**
 The producer is configured with `acks=all` + `enable.idempotence=True` + `compression.type=snappy`. This combination prevents message loss on broker restart and eliminates silent duplicates without requiring transactions.
@@ -248,7 +310,7 @@ The anomaly mart requires `HAVING COUNT(*) >= 24` (one full day of hourly readin
 
 ## 🛡️ Data Quality
 
-Three automated checks run after every hourly load, results logged and visible in the Pipeline Health dashboard:
+Three automated checks run after every hourly load:
 
 | # | Check | Pass condition | What it catches |
 |:---|:---|:---|:---|

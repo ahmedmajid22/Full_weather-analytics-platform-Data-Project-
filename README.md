@@ -375,7 +375,7 @@ weather-analytics-platform/
 
 <div align="center">
 
-**Built with purpose. Designed for the interview room.**
+**Built with purpose to be awesome.**
 
 *If this project helped you, leave a ⭐ — it genuinely helps.*
 

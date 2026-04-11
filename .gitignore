@@ -12,6 +12,7 @@ airflow/logs/
 # dbt
 dbt/target/
 dbt/dbt_packages/
+dbt/profiles.yml
 
 # Mac
 .DS_Store

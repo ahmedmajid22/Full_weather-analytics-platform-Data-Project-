@@ -2,28 +2,82 @@ version: 2
 
 models:
   - name: daily_summary
-    description: "Daily min/max/avg weather per city"
+    description: "Daily min/max/avg weather per city — one row per city per calendar day"
     columns:
       - name: city_name
         tests: [not_null]
       - name: date
         tests: [not_null]
       - name: avg_temp_c
+        # not_null intentionally omitted: if ALL readings for a city-day have NULL
+        # temperature_c (e.g. API outage), AVG returns NULL and that is correct behaviour.
+        description: "Average temperature in Celsius for this city on this date"
+      - name: reading_count
         tests: [not_null]
 
   - name: temperature_anomalies
-    description: "Statistical anomaly detection — z-score and robust IQR score"
+    description: >
+      Statistical anomaly detection using a 30-day rolling baseline per city.
+      Requires at least 24 readings (one full day) per city to compute reliable stats.
+      Cities with insufficient data are excluded from this mart.
     columns:
       - name: city_name
         tests: [not_null]
+      - name: temperature_c
+        tests: [not_null]
+
+      # BUG FIX: removed not_null test on z_score.
+      # z_score is computed as (temp - mean) / NULLIF(stddev, 0).
+      # When all readings for a city share the exact same temperature (stddev = 0),
+      # NULLIF returns NULL and z_score is correctly NULL — not an error.
+      # A not_null test would fail on that edge case and block dbt runs.
       - name: z_score
+        description: "Standard z-score; NULL when city stddev is zero (all readings identical)"
+
+      - name: robust_z_score
+        description: "IQR-based z-score; NULL when IQR is zero"
+
+      - name: anomaly_severity
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['extreme', 'significant', 'normal']
+
+      - name: is_anomaly
         tests: [not_null]
 
   - name: city_comparisons
-    description: "All-time summary stats per city for global comparison"
+    description: "All-time aggregate stats per city — used for global map and ranking table"
+    columns:
+      - name: city_name
+        tests: [not_null]
+      - name: avg_temp_c
+        description: "All-time average temperature in Celsius"
+      - name: total_readings
+        tests: [not_null]
 
   - name: weekly_trends
-    description: "7-day rolling average temperature per city"
+    description: "7-day rolling average temperature per city, one row per city per day"
+    columns:
+      - name: city_name
+        tests: [not_null]
+      - name: day
+        tests: [not_null]
+      - name: daily_avg_temp_c
+        description: "Average temperature across all hourly readings for that day"
+      - name: temp_7day_rolling_avg
+        # not_null omitted: rolling avg is NULL for cities with fewer than 7 days of data
+        # (ROWS BETWEEN 6 PRECEDING AND CURRENT ROW only uses available rows but
+        # the average is still meaningful; it's not NULL unless ALL inputs are NULL)
+        description: "7-day rolling average; uses all available preceding days if < 7 days of data"
 
   - name: extreme_weather
-    description: "Heatwaves, freezes, storms and high wind events"
+    description: "Heatwaves, freezes, storms, and high-wind events — all-time history"
+    columns:
+      - name: city_name
+        tests: [not_null]
+      - name: event_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Thunderstorm', 'Heatwave', 'Freeze', 'High winds', 'Heavy rain', 'Other']

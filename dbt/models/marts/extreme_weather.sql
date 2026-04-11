@@ -15,12 +15,13 @@ WITH readings AS (
         weather_condition
     FROM {{ ref('stg_weather_readings') }}
     WHERE
-        temperature_c > 35
+        temperature_c    > 35
         OR temperature_c < -10
         OR windspeed_kmh > 60
         OR precipitation_mm > 10
         OR weather_condition = 'Thunderstorm'
 ),
+
 cities AS (
     SELECT id, name, country, continent
     FROM {{ ref('stg_cities') }}
@@ -35,14 +36,20 @@ SELECT
     readings.windspeed_kmh,
     readings.precipitation_mm,
     readings.weather_condition,
+
+    -- BUG FIX (from previous version): Thunderstorm is now evaluated FIRST.
+    -- In the old ordering, a thunderstorm at 36°C was labelled 'Heatwave' because
+    -- the temperature check came before the weather_condition check.
+    -- Thunderstorm is the most specific label and should always win.
     CASE
-        WHEN readings.temperature_c > 35                  THEN 'Heatwave'
-        WHEN readings.temperature_c < -10                 THEN 'Freeze'
-        WHEN readings.windspeed_kmh > 60                  THEN 'High winds'
-        WHEN readings.precipitation_mm > 10               THEN 'Heavy rain'
-        WHEN readings.weather_condition = 'Thunderstorm'  THEN 'Thunderstorm'
+        WHEN readings.weather_condition = 'Thunderstorm' THEN 'Thunderstorm'
+        WHEN readings.temperature_c     > 35             THEN 'Heatwave'
+        WHEN readings.temperature_c     < -10            THEN 'Freeze'
+        WHEN readings.windspeed_kmh     > 60             THEN 'High winds'
+        WHEN readings.precipitation_mm  > 10             THEN 'Heavy rain'
         ELSE 'Other'
     END AS event_type
+
 FROM readings
 JOIN cities ON cities.id = readings.city_id
 ORDER BY readings.reading_at DESC

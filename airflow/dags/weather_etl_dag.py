@@ -1,5 +1,5 @@
+# airflow/dags/weather_etl_dag.py
 import json
-import time
 from datetime import datetime, timedelta
 
 import requests
@@ -10,16 +10,21 @@ from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 
-OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
+OPEN_METEO_URL  = "https://api.open-meteo.com/v1/forecast"
 PUSHGATEWAY_URL = "http://pushgateway:9091"
-MINIO_ENDPOINT   = "http://minio:9000"
+MINIO_ENDPOINT  = "http://minio:9000"
 MINIO_ACCESS_KEY = "minioadmin"
 MINIO_SECRET_KEY = "minioadmin"
 
 VARIABLES = [
-    "temperature_2m", "apparent_temperature", "precipitation",
-    "windspeed_10m", "relative_humidity_2m", "weathercode",
+    "temperature_2m",
+    "apparent_temperature",
+    "precipitation",
+    "windspeed_10m",
+    "relative_humidity_2m",
+    "weathercode",
 ]
 
 default_args = {
@@ -32,10 +37,8 @@ default_args = {
 
 
 def get_pg_conn():
-    return psycopg2.connect(
-        host="postgres", database="airflow",
-        user="airflow", password="airflow"
-    )
+    hook = PostgresHook(postgres_conn_id="postgres_default")
+    return hook.get_conn()
 
 
 def get_s3_client():
@@ -50,14 +53,19 @@ def get_s3_client():
 
 
 def fetch_and_stage(**context):
-    """Fetch weather for all 50 cities, stage raw JSON to MinIO."""
-    execution_dt = context["execution_date"]
+    """
+    Fetch hourly weather for all cities from Open-Meteo.
+    Stores raw JSON in MinIO (partitioned by city/year/month/day/hour).
+    Pushes per-city XCom metadata so load_to_postgres can locate each file.
+    Returns a summary dict — NOT the raw data (XCom size limit).
+    """
+    execution_dt = context["data_interval_start"]
     year  = execution_dt.strftime("%Y")
     month = execution_dt.strftime("%m")
     day   = execution_dt.strftime("%d")
     hour  = execution_dt.strftime("%H")
 
-    conn = get_pg_conn()
+    conn   = get_pg_conn()
     cursor = conn.cursor()
     cursor.execute("SELECT id, name, latitude, longitude FROM weather.cities ORDER BY id")
     cities = cursor.fetchall()
@@ -65,65 +73,101 @@ def fetch_and_stage(**context):
     conn.close()
 
     s3 = get_s3_client()
-    results = []
-    errors  = []
+    success_count = 0
+    error_count   = 0
 
     for city_id, name, lat, lon in cities:
         try:
             params = {
-                "latitude": float(lat),
-                "longitude": float(lon),
-                "hourly": ",".join(VARIABLES),
-                "timezone": "UTC",
+                "latitude":     float(lat),
+                "longitude":    float(lon),
+                "hourly":       ",".join(VARIABLES),
+                "timezone":     "UTC",
                 "forecast_days": 1,
             }
             resp = requests.get(OPEN_METEO_URL, params=params, timeout=30)
             resp.raise_for_status()
             data = resp.json()
 
-            # Stage to MinIO with partitioned path
             city_slug = name.replace(" ", "_").lower()
-            key = f"city={city_slug}/year={year}/month={month}/day={day}/hour={hour}/data.json"
+            s3_key = (
+                f"city={city_slug}/year={year}/month={month}"
+                f"/day={day}/hour={hour}/data.json"
+            )
+
             s3.put_object(
                 Bucket="weather-raw",
-                Key=key,
+                Key=s3_key,
                 Body=json.dumps(data),
                 ContentType="application/json",
             )
 
-            results.append({"city_id": city_id, "name": name, "data": data})
+            # Push ONLY lightweight metadata per city (not the full JSON payload)
+            context["ti"].xcom_push(
+                key=f"city_{city_id}",
+                value={"city_id": city_id, "name": name, "s3_key": s3_key},
+            )
+
+            success_count += 1
 
         except Exception as e:
-            errors.append({"city": name, "error": str(e)})
+            error_count += 1
             print(f"ERROR fetching {name}: {e}")
 
-    print(f"Fetched {len(results)} cities, {len(errors)} errors")
-    _push_metrics("fetch_stage", len(results), len(errors))
-    return results
+    _push_metrics("fetch_stage", success_count, error_count)
+    print(f"fetch_and_stage complete — success={success_count}, errors={error_count}")
+    return {"success": success_count, "failed": error_count}
 
 
 def load_to_postgres(**context):
-    """Load fetched data into PostgreSQL with idempotent upsert."""
-    ti      = context["ti"]
-    results = ti.xcom_pull(task_ids="fetch_and_stage")
+    """
+    Reads each city's staged JSON from MinIO using the XCom s3_key.
+    Inserts all hourly rows into weather.weather_readings with ON CONFLICT DO UPDATE
+    (idempotent — safe to rerun without duplicates).
+    """
+    ti = context["ti"]
 
-    if not results:
-        raise ValueError("No data received from fetch_and_stage task")
-
+    # Retrieve city IDs from DB so we know which XCom keys to look up
     conn   = get_pg_conn()
     cursor = conn.cursor()
-    run_id = context["run_id"]
+    cursor.execute("SELECT id FROM weather.cities ORDER BY id")
+    city_ids = [row[0] for row in cursor.fetchall()]
+    cursor.close()
+
+    s3 = get_s3_client()
     rows_loaded = 0
-    rows_fetched = 0
+    errors      = 0
 
-    for city_result in results:
-        city_id = city_result["city_id"]
-        hourly  = city_result["data"].get("hourly", {})
-        times   = hourly.get("time", [])
-        rows_fetched += len(times)
+    for city_id in city_ids:
+        city_meta = ti.xcom_pull(task_ids="fetch_and_stage", key=f"city_{city_id}")
+        if not city_meta:
+            print(f"No XCom for city_id={city_id} — skipping")
+            errors += 1
+            continue
 
-        for i, ts in enumerate(times):
-            try:
+        try:
+            obj  = s3.get_object(Bucket="weather-raw", Key=city_meta["s3_key"])
+            data = json.loads(obj["Body"].read().decode("utf-8"))
+
+            hourly = data.get("hourly", {})
+            times  = hourly.get("time", [])
+
+            if not times:
+                print(f"No hourly data for {city_meta['name']}")
+                continue
+
+            temps  = hourly.get("temperature_2m",        [])
+            feels  = hourly.get("apparent_temperature",  [])
+            precip = hourly.get("precipitation",         [])
+            winds  = hourly.get("windspeed_10m",         [])
+            humid  = hourly.get("relative_humidity_2m",  [])
+            codes  = hourly.get("weathercode",           [])
+
+            def safe_get(lst, idx):
+                return lst[idx] if idx < len(lst) else None
+
+            cursor = conn.cursor()
+            for i, ts in enumerate(times):
                 cursor.execute("""
                     INSERT INTO weather.weather_readings
                         (city_id, timestamp, temperature, feels_like,
@@ -137,95 +181,114 @@ def load_to_postgres(**context):
                         humidity      = EXCLUDED.humidity,
                         weather_code  = EXCLUDED.weather_code
                 """, (
-                    city_id, ts,
-                    hourly.get("temperature_2m",      [None])[i],
-                    hourly.get("apparent_temperature", [None])[i],
-                    hourly.get("precipitation",        [None])[i],
-                    hourly.get("windspeed_10m",        [None])[i],
-                    hourly.get("relative_humidity_2m", [None])[i],
-                    hourly.get("weathercode",          [None])[i],
+                    city_id,
+                    ts,
+                    safe_get(temps,  i),
+                    safe_get(feels,  i),
+                    safe_get(precip, i),
+                    safe_get(winds,  i),
+                    safe_get(humid,  i),
+                    safe_get(codes,  i),
                 ))
                 rows_loaded += 1
-            except Exception as e:
-                print(f"Row error city_id={city_id} ts={ts}: {e}")
+            conn.commit()
+            cursor.close()
 
-    # Log this pipeline run with both rows_fetched and rows_loaded
-    cursor.execute("""
-        INSERT INTO weather.pipeline_runs (run_id, rows_fetched, rows_loaded, status)
+        except Exception as e:
+            errors += 1
+            print(f"ERROR loading city_id={city_id} ({city_meta.get('name')}): {e}")
+
+    # Log this pipeline run
+    run_cursor = conn.cursor()
+    run_cursor.execute("""
+        INSERT INTO weather.pipeline_runs
+            (run_id, rows_fetched, rows_loaded, status)
         VALUES (%s, %s, %s, %s)
-    """, (run_id, rows_fetched, rows_loaded, "success"))
-
+    """, (
+        context["run_id"],
+        rows_loaded + errors,
+        rows_loaded,
+        "success" if errors == 0 else "partial",
+    ))
     conn.commit()
-    cursor.close()
+    run_cursor.close()
     conn.close()
 
-    print(f"Fetched {rows_fetched} records, loaded {rows_loaded} rows to PostgreSQL")
-    _push_metrics("load_postgres", rows_loaded, 0)
+    _push_metrics("load_postgres", rows_loaded, errors)
+    print(f"load_to_postgres complete — rows_loaded={rows_loaded}, errors={errors}")
     return rows_loaded
 
 
 def validate_data(**context):
-    """Run 3 data quality checks and flag issues."""
+    """
+    Three data quality checks after every load:
+    1. City coverage: at least 45/50 cities must have data in the last 2 hours.
+    2. Null temperatures: none allowed in recent data.
+    3. Extreme values: no temperature outside −90°C to 60°C.
+    """
     conn   = get_pg_conn()
     cursor = conn.cursor()
     issues = []
 
-    # Check 1: city coverage in last 2 hours
+    # Check 1: city coverage
     cursor.execute("""
-        SELECT COUNT(DISTINCT city_id) FROM weather.weather_readings
+        SELECT COUNT(DISTINCT city_id)
+        FROM weather.weather_readings
         WHERE timestamp > NOW() - INTERVAL '2 hours'
     """)
     city_count = cursor.fetchone()[0]
     if city_count < 45:
-        issues.append(f"LOW COVERAGE: only {city_count}/50 cities loaded in last 2 hours")
+        issues.append(f"LOW COVERAGE: only {city_count}/50 cities in last 2 hours")
 
-    # Check 2: null temperature rate
+    # Check 2: null temperatures in recent data
     cursor.execute("""
-        SELECT COUNT(*) FROM weather.weather_readings
+        SELECT COUNT(*)
+        FROM weather.weather_readings
         WHERE temperature IS NULL
-        AND timestamp > NOW() - INTERVAL '2 hours'
+          AND timestamp > NOW() - INTERVAL '2 hours'
     """)
     null_count = cursor.fetchone()[0]
     if null_count > 0:
-        issues.append(f"NULL TEMPERATURES: {null_count} readings missing temperature")
+        issues.append(f"NULL TEMPERATURES: {null_count} rows in last 2 hours")
 
-    # Check 3: extreme/impossible values
+    # Check 3: physically impossible temperature values
     cursor.execute("""
-        SELECT COUNT(*) FROM weather.weather_readings
+        SELECT COUNT(*)
+        FROM weather.weather_readings
         WHERE (temperature < -90 OR temperature > 60)
-        AND timestamp > NOW() - INTERVAL '2 hours'
+          AND timestamp > NOW() - INTERVAL '2 hours'
     """)
     extreme_count = cursor.fetchone()[0]
     if extreme_count > 0:
-        issues.append(f"EXTREME VALUES: {extreme_count} temperatures outside -90°C to 60°C")
+        issues.append(f"EXTREME VALUES: {extreme_count} rows outside −90°C to 60°C")
 
     cursor.close()
     conn.close()
 
     if issues:
-        print(f"DATA QUALITY ISSUES DETECTED: {issues}")
+        print(f"DATA QUALITY ISSUES: {issues}")
     else:
-        print("All data quality checks passed.")
+        print("All data quality checks passed ✓")
 
-    return {"issues": issues, "city_coverage": city_count, "passed": len(issues) == 0}
+    return {"issues": issues, "passed": len(issues) == 0}
 
 
-def _push_metrics(job: str, rows_success: int, rows_failed: int):
+def _push_metrics(job: str, success: int, failed: int):
     try:
         registry = CollectorRegistry()
-        g_ok  = Gauge("weather_rows_loaded_total",  "Rows loaded",  registry=registry)
-        g_err = Gauge("weather_rows_failed_total",  "Rows failed",  registry=registry)
-        g_ok.set(rows_success)
-        g_err.set(rows_failed)
+        g_ok   = Gauge("weather_rows_success_total", "Rows loaded successfully", registry=registry)
+        g_fail = Gauge("weather_rows_failed_total",  "Rows failed",             registry=registry)
+        g_ok.set(success)
+        g_fail.set(failed)
         push_to_gateway(PUSHGATEWAY_URL, job=job, registry=registry)
     except Exception as e:
-        print(f"Prometheus push failed (non-critical): {e}")
+        print(f"Metrics push error (non-fatal): {e}")
 
 
 with DAG(
     dag_id="weather_etl",
     default_args=default_args,
-    description="Hourly ETL: Open-Meteo API → MinIO (raw JSON) → PostgreSQL",
+    description="Hourly ETL: Open-Meteo → MinIO (raw JSON) → PostgreSQL → validation",
     schedule_interval="@hourly",
     start_date=datetime(2026, 1, 1),
     catchup=False,

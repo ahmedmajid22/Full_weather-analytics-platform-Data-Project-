@@ -1,15 +1,3 @@
-CREATE TABLE IF NOT EXISTS weather.cities (
-    id           SERIAL PRIMARY KEY,
-    name         VARCHAR(100) NOT NULL,
-    country      VARCHAR(100) NOT NULL,
-    country_code CHAR(2)      NOT NULL,
-    continent    VARCHAR(50)  NOT NULL,
-    latitude     NUMERIC(8,5) NOT NULL,
-    longitude    NUMERIC(8,5) NOT NULL,
-    timezone     VARCHAR(50)  NOT NULL,
-    population   INTEGER
-);
-
 INSERT INTO weather.cities (name, country, country_code, continent, latitude, longitude, timezone, population) VALUES
 ('London',         'United Kingdom', 'GB', 'Europe',        51.50740,  -0.12780, 'Europe/London',                   9000000),
 ('Paris',          'France',         'FR', 'Europe',        48.85660,   2.35220, 'Europe/Paris',                    2100000),

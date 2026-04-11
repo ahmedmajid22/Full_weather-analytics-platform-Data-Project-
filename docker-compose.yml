@@ -117,6 +117,21 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
 
+  kafka-consumer:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./kafka:/app
+    command: >
+      bash -c "pip install confluent-kafka psycopg2-binary --quiet &&
+               python consumer.py"
+    depends_on:
+      - kafka
+      - postgres
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"

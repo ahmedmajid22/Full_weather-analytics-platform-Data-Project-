@@ -1,5 +1,6 @@
 <div align="center">
 
+
 <br/>
 
 ```
@@ -14,7 +15,6 @@
 ### **Global Weather Analytics Platform**
 *Production-grade data engineering — batch, streaming, analytics, and observability.*
 *50 cities · 6 continents · 16 services · $0 cloud spend.*
-
 <br/>
 
 [![Airflow](https://img.shields.io/badge/Apache%20Airflow-2.8.1-017CEE?style=for-the-badge&logo=apacheairflow&logoColor=white)](https://airflow.apache.org)
